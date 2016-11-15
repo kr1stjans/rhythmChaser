@@ -1,0 +1,20 @@
+Page {
+    background-color: #3498DB;
+    font-size: 15;
+    color: #ECF0F1;
+}
+
+Label {
+    font-size: 40;
+    margin: 50;
+    text-align: center;
+}
+
+Button {
+    margin-top: 50;
+    width: 200;
+    height: 200;
+    border-radius: 100;
+    font-size: 35;
+    background-color: #2980B9;
+}
