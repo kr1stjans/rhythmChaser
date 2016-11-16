@@ -1,3 +1,4 @@
-<StackLayout>
-    <Label [text]="score" textWrap="true"></Label>
-</StackLayout>
+<AbsoluteLayout id="scoresLayout">
+    <Label class="big-text" top="2" left="105" [text]="score" textWrap="true"></Label>
+    <Label class="middle-text" top="475" left="225" text="x{{scoreMultiplier}}"></Label>
+</AbsoluteLayout>

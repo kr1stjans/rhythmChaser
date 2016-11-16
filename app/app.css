@@ -4,10 +4,25 @@ Page {
     color: #ECF0F1;
 }
 
+.big-text {
+    font-size: 50;
+}
+
+.middle-text {
+    font-size: 35;
+}
+
 Label {
-    font-size: 40;
-    margin: 50;
     text-align: center;
+    margin: 25;
+}
+
+.score-label {
+    background-color: #ECF0F1;
+    color: #3498DB;
+    width: 100;
+    height: 100;
+    border-radius: 50;
 }
 
 Button {
