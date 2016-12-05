@@ -60,12 +60,12 @@ export class GameComponent implements OnInit {
             // start accelerometer updates
             startAccelerometerUpdates((data: AccelerometerData) => {
                 this.zone.run(() => {
-                    var result = this.naiveFilter(data.z);
+                    var result = this.naiveFilter(data.x + data.y + data.z);
                     var signalHigh: boolean = this.detectSignalHigh(result);
                     if (signalHigh) {
                         this.gestureMade = true;
                     }
-                    //console.log(data.z);
+                    console.log(data.x + data.y + data.z);
                 });
             });
 
@@ -82,7 +82,7 @@ export class GameComponent implements OnInit {
                 for (let beat of this.beatArray) {
                     // beat at current time detected
                     var diff = Math.abs(beat - timeSinceStartInSeconds);
-                    if (diff < 0.11) {
+                    if (diff < 0.13) { // 0.11 hard
                         actualBeatExists = true;
                         break;
                     }
@@ -193,7 +193,7 @@ export class GameComponent implements OnInit {
     }
 
     private naiveFilter(input) {
-        if (input > 0.185) {
+        if (input > -0.25) {
             return 1;
         } else {
             return 0;

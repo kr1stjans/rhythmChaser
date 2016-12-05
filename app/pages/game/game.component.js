@@ -41,12 +41,12 @@ var GameComponent = (function () {
             // start accelerometer updates
             nativescript_accelerometer_1.startAccelerometerUpdates(function (data) {
                 _this.zone.run(function () {
-                    var result = _this.naiveFilter(data.z);
+                    var result = _this.naiveFilter(data.x + data.y + data.z);
                     var signalHigh = _this.detectSignalHigh(result);
                     if (signalHigh) {
                         _this.gestureMade = true;
                     }
-                    //console.log(data.z);
+                    console.log(data.x + data.y + data.z);
                 });
             });
         });
@@ -60,7 +60,7 @@ var GameComponent = (function () {
                     var beat = _a[_i];
                     // beat at current time detected
                     var diff = Math.abs(beat - timeSinceStartInSeconds);
-                    if (diff < 0.11) {
+                    if (diff < 0.13) {
                         actualBeatExists = true;
                         break;
                     }
@@ -161,7 +161,7 @@ var GameComponent = (function () {
         return result[result.length - 1];
     };
     GameComponent.prototype.naiveFilter = function (input) {
-        if (input > 0.185) {
+        if (input > -0.25) {
             return 1;
         }
         else {
