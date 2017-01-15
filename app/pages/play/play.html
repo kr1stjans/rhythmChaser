@@ -1,6 +1,8 @@
+<ActionBar title="Rhythm Chaser">
+</ActionBar>
+
 <StackLayout>
     <Image src="~/images/rhythm.png"></Image>
-    <Label class="middle-text" text="Rhythm Chaser" textWrap="true"></Label>
-    <Button text="Easy" [nsRouterLink]="['/game']" clearHistory="true"></Button>
-    <Button text="Hard" [nsRouterLink]="['/game']" clearHistory="true"></Button>
+    <Button cssClass="menu-button" text="TUTORIAL" [nsRouterLink]="['/tutorial']"></Button>
+    <Button cssClass="menu-button" text="PLAY" [nsRouterLink]="['/game']"></Button>
 </StackLayout>

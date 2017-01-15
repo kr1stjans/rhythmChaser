@@ -1,4 +1,7 @@
-<AbsoluteLayout id="scoresLayout">
-    <Label class="big-text" top="2" left="105" [text]="score" textWrap="true"></Label>
-    <Label class="middle-text" top="475" left="225" text="x{{scoreMultiplier}}"></Label>
-</AbsoluteLayout>
+<ActionBar title="Rhythm Chaser">
+    <NavigationButton text="" android.systemIcon="ic_menu_back"></NavigationButton>
+    <ActionItem id="tutorialActionItem" ios.systemIcon="17" ios.position="right"
+                android.systemIcon="ic_btn_search_go" (tap)="play()"></ActionItem>
+</ActionBar>
+<StackLayout id="scoresLayout">
+</StackLayout>

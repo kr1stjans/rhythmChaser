@@ -1,145 +1,136 @@
-import {Component, NgZone, OnInit} from "@angular/core";
+import {Component, NgZone, OnInit, OnDestroy} from "@angular/core";
 import {Page} from "ui/page";
 
-import {startAccelerometerUpdates, AccelerometerData} from "nativescript-accelerometer";
 import {TNSPlayer, AudioPlayerOptions} from 'nativescript-audio';
 
-import {zScore} from "../../shared/detection_algorithms/zscore";
-import {KalmanFilter} from "../../shared/detection_algorithms/kalmanjs";
 import {Label} from "ui/label";
 import {AbsoluteLayout} from "ui/layouts/absolute-layout";
 import {Animation} from "ui/animation";
-import {knownFolders} from "file-system"
+import {ListPicker} from "ui/list-picker";
+import {QuickGestureDetectable, QuickGestureDetection} from "../../shared/detection.component";
+import {MusicService} from "./music.services";
+import {StackLayout} from "ui/layouts/stack-layout";
 
 @Component({
     selector: "game",
-    templateUrl: "pages/game/game.html"
+    templateUrl: "pages/game/game.html",
+    providers: [MusicService]
 })
-export class GameComponent implements OnInit {
-    private lastValue: number = 0;
-    private buffer: Array<number> = [];
-    private zscore = new zScore(5, 3.5, 0.1);
-    private kalman = new KalmanFilter({R: 5, Q: 0.01});
-
+export class GameComponent implements OnInit, OnDestroy, QuickGestureDetectable {
     private player: TNSPlayer;
     private scoresLayout: AbsoluteLayout;
 
-    // animation variables
-    private animationPositions: Array<number> = [20, 60, 100, 140, 180, 220];
-    private animationDirection: AnimationDirection = AnimationDirection.INCREASING;
-    private animationPosition: number = this.animationPositions.length / 2;
+    private quickGestureDetection: QuickGestureDetection;
+    private songPicker: ListPicker;
 
     // score variables
     private score: number = 0;
     private scoreMultiplier: number = 1;
 
-    // beat variables
-    private beatArray: Array<number>;
-    private startTime: number;
-    private gestureMade: boolean = false;
+    private songs: Array<any>;
+    private selectedSong;
 
-    constructor(private zone: NgZone, private page: Page) {
+    // beat variables
+    private startTime: number;
+
+    constructor(private musicService: MusicService, private zone: NgZone, private page: Page) {
     }
 
-    ngOnInit() {
-        this.scoresLayout = <AbsoluteLayout> this.page.getViewById("scoresLayout");
+    /**
+     * Clear song picker and init gesture & audio player.
+     */
+    private play() {
+        this.quickGestureDetection = new QuickGestureDetection(this);
         this.player = new TNSPlayer();
-
-        // read beats file
-        knownFolders.currentApp().getFile("/audio/faded.csv").readText().then((text) => {
-            this.beatArray = text.split(",").map(function (value) {
-                return +value;
-            });
-        }).then(() => {
-
-            // start playing song
-            this.playAudio("~/audio/faded.mp3", "localFile");
-
+        this.selectedSong = this.songs[this.songPicker.selectedIndex];
+        this.playAudio(this.selectedSong['url_music'], "remoteFile", () => {
             this.startTime = new Date().getTime();
-
-            // start accelerometer updates
-            startAccelerometerUpdates((data: AccelerometerData) => {
-                this.zone.run(() => {
-                    var result = this.naiveFilter(data.x + data.y + data.z);
-                    var signalHigh: boolean = this.detectSignalHigh(result);
-                    if (signalHigh) {
-                        this.gestureMade = true;
-                    }
-                    console.log(data.x + data.y + data.z);
-                });
-            });
-
         });
 
-        // view must be manually updated every 100ms or it overuses the cpu and no update is processed
-        setInterval(() => {
-
-            // if gesture was made check if actual beat exists
-            if (this.gestureMade) {
-
-                var actualBeatExists: boolean = false;
-                var timeSinceStartInSeconds: number = (new Date().getTime() - this.startTime) / 1000;
-                for (let beat of this.beatArray) {
-                    // beat at current time detected
-                    var diff = Math.abs(beat - timeSinceStartInSeconds);
-                    if (diff < 0.13) { // 0.11 hard
-                        actualBeatExists = true;
-                        break;
-                    }
-                }
-
-                var label = new Label();
-                label.cssClass = "big-text score-label";
-                label.text = "+" + (actualBeatExists ? this.scoreMultiplier : 0);
-
-                AbsoluteLayout.setLeft(label, this.animationPositions[this.animationPosition]);
-                AbsoluteLayout.setTop(label, 425);
-
-                this.scoresLayout.addChild(label);
-
-                var animation: Animation = label.createAnimation({
-                    translate: {x: 0, y: -425},
-                    opacity: 0.5,
-                    duration: 2000,
-                    scale: {x: 0.5, y: 0.5},
-                });
-
-                animation.play().then(() => {
-                    this.scoresLayout.removeChild(label);
-                });
-
-                if (actualBeatExists) {
-                    this.score += this.scoreMultiplier;
-                    this.scoreMultiplier++;
-                } else {
-                    this.scoreMultiplier = 1;
-                }
-
-                // adjust position
-                if (this.animationDirection == AnimationDirection.INCREASING && this.animationPosition < this.animationPositions.length - 1) {
-                    this.animationPosition++;
-                } else if (this.animationDirection == AnimationDirection.INCREASING && this.animationPosition == this.animationPositions.length - 1) {
-                    this.animationPosition--;
-                    this.animationDirection = AnimationDirection.DECREASING;
-                } else if (this.animationDirection == AnimationDirection.DECREASING && this.animationPosition > 0) {
-                    this.animationPosition--;
-                } else if (this.animationDirection == AnimationDirection.DECREASING && this.animationPosition == 0) {
-                    this.animationPosition++;
-                    this.animationDirection = AnimationDirection.INCREASING;
-                }
-
-                // reset beat detection states
-                this.gestureMade = false;
-            }
-        }, 100);
-
+        this.scoresLayout.removeChildren();
     }
 
-    private playAudio(filepath: string, fileType: string) {
+    /**
+     * Init song picker and fetch songs from backend.
+     */
+    public ngOnInit() {
+        this.scoresLayout = <StackLayout> this.page.getViewById("scoresLayout");
+
+        this.songPicker = new ListPicker();
+        this.songPicker.cssClass = "song-picker";
+        this.scoresLayout.addChild(this.songPicker);
+
+        this.musicService.getData().map(json => json.content).subscribe(
+            (result) => {
+                this.songs = result;
+                this.songPicker.items = result.map(item =>
+                item['author'] + " - " +
+                item['title'] +
+                "(Your best: " +
+                (item['user_score'] != null ? item['user_score'] : 0) +
+                ", World best: " +
+                (item['high_score'] != null ? item['high_score'] : 0));
+            },
+            (error) => console.log(error)
+        );
+    }
+
+    public quickGestureDetected() {
+        var actualBeatExists: boolean = false;
+        var timeSinceStartInSeconds: number = (new Date().getTime() - this.startTime) / 1000;
+
+        var beats = this.selectedSong['beats'].split(",").map(function (value) {
+            return +value;
+        });
+
+        for (let beat of beats) {
+            // beat at current time detected
+            var diff = Math.abs(beat - timeSinceStartInSeconds);
+            if (diff < 0.13) { // 0.11 hard
+                actualBeatExists = true;
+                break;
+            }
+        }
+        this.scoresLayout.removeChildren();
+        if (actualBeatExists) {
+            this.createGestureDetectedLabel("x " + this.scoreMultiplier);
+            this.score += this.scoreMultiplier;
+            this.scoreMultiplier++;
+        } else {
+            this.scoreMultiplier = 0;
+        }
+    }
+
+    private createGestureDetectedLabel(text: string) {
+        var label = new Label();
+        label.textWrap = true;
+        label.cssClass = "gesture-detected";
+        label.text = text;
+
+        this.scoresLayout.addChild(label);
+
+        var animation: Animation = label.createAnimation({
+            duration: 1500,
+            scale: {x: 0.1, y: 0.1},
+        });
+
+        return animation.play();
+    }
+
+    public ngOnDestroy() {
+        this.player.pause();
+        this.quickGestureDetection.destroy();
+    }
+
+    public getNgZone() {
+        return this.zone;
+    }
+
+    private playAudio(filepath: string, fileType: string, callback) {
         try {
             var playerOptions: AudioPlayerOptions = {
                 audioFile: filepath,
-                loop: true,
+                loop: false,
                 completeCallback: () => {
                     this.player.dispose().then(() => {
                         console.log('DISPOSED');
@@ -164,8 +155,7 @@ export class GameComponent implements OnInit {
                     console.log(err);
                 });
             } else if (fileType === 'remoteFile') {
-                this.player.playFromUrl(playerOptions).then(() => {
-                }, (err) => {
+                this.player.playFromUrl(playerOptions).then(callback, (err) => {
                     console.log(err);
                 });
             }
@@ -173,46 +163,4 @@ export class GameComponent implements OnInit {
             console.log(ex);
         }
     }
-
-    /**
-     * Input must be new single value.
-     * @param input
-     */
-    private kalmanFilter(input) {
-        return this.kalman.filter(input);
-    }
-
-    /**
-     * Input must be an array of all values until now.
-     * @param input
-     */
-    private zscoreFilter(input) {
-        this.buffer.push(input);
-        var result = this.zscore.filter(this.buffer);
-        return result[result.length - 1];
-    }
-
-    private naiveFilter(input) {
-        if (input > -0.25) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
-
-    private detectSignalHigh(input) {
-        var result;
-        if (this.lastValue == 0 && input == 1) {
-            result = true;
-        } else {
-            result = false;
-        }
-        this.lastValue = input;
-        return result;
-    }
-}
-
-enum AnimationDirection {
-    INCREASING,
-    DECREASING
 }

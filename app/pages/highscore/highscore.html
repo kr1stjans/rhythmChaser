@@ -1,0 +1,13 @@
+<ActionBar title="Highscores">
+    <NavigationButton text="" android.systemIcon="ic_menu_back"></NavigationButton>
+</ActionBar>
+<StackLayout>
+    <ListView [items]="highscoreList" style="height: 100%; background-color: #2196F3;" (itemLoading)="onItemLoading($event)">
+        <template let-item="item">
+            <StackLayout class="highscore-item" orientation="horizontal">
+                <Label class="highscore-item-label" [text]="item.name"></Label>
+                <Label class="highscore-item-label" [text]="item.score"></Label>
+            </StackLayout>
+        </template>
+    </ListView>
+</StackLayout>
