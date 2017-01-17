@@ -1,13 +1,16 @@
 export class zScore {
 
-    lag: number ;
-    threshold: number;
-    influence: number;
+    private lag: number;
+    private threshold: number;
+    private influence: number;
+    private y;
+
 
     constructor(lag: number, threshold: number, influence: number) {
         this.lag = lag;
         this.threshold = threshold;
         this.influence = influence;
+        this.y = [];
     }
 
     average(data: Array<number>) {
@@ -37,42 +40,32 @@ export class zScore {
         return Array.apply(null, Array(length)).map(Number.prototype.valueOf, 0)
     }
 
-    filter(y: Array<number>) {
-        // Initialise signal results
-        let signals = this.emptyArray(y.length);
-        // Initialise filtered series
-        let filteredY = y.slice(0, this.lag);
-        // Initialise filters
-        let avgFilter = this.emptyArray(y.length);
-        let stdFilter = this.emptyArray(y.length);
+    filter(input: number) {
+        this.y.push(input);
+        if (this.y.length <= this.lag) {
+            return 0;
+        }
 
-        avgFilter[this.lag] = this.average(y.slice(0, this.lag));
-        stdFilter[this.lag] = this.standardDeviation(y.slice(0, this.lag));
+        let signals = this.emptyArray(this.y.length);
+        var tmpThreshold = this.average(this.y.slice(0, this.lag)) + this.standardDeviation(this.y.slice(0, this.lag));
+        var PEAK = 0;
+        var zaznanPeak = 0;
 
         //  Loop over all datapoints y(lag+2),...,y(t)
-        for (var i = this.lag + 1; i < y.length; i++) {
-            // If new value is a specified number of deviations away
-            if (Math.abs(y[i] - avgFilter[i - 1]) > this.threshold * stdFilter[i - 1]) {
-                if (y[i] > avgFilter[i - 1]) {
-                    // Positive signal
-                    signals[i] = 1;
-                } else {
-                    // Negative signal
-                    signals[i] = 0;
+        for (var i = this.lag + 1; i < this.y.length; i++) {
+            if (this.y[i] > tmpThreshold) {
+                zaznanPeak = 1;
+                if (PEAK < this.y[i]) {
+                    PEAK = this.y[i];
                 }
-                // Adjust the filters
-                filteredY[i] = this.influence * y[i] + (1 - this.influence) * filteredY[i - 1];
-                avgFilter[i] = this.average(filteredY.slice(i - this.lag, i));
-                stdFilter[i] = this.standardDeviation(filteredY.slice(i - this.lag, i));
-            } else {
-                // No signal
-                signals[i] = 0;
-                // Adjust the filters
-                filteredY[i] = y[i];
-                avgFilter[i] = this.average(filteredY.slice(i - this.lag, i));
-                stdFilter[i] = this.standardDeviation(filteredY.slice(i - this.lag, i));
             }
+            else if (this.y[i] < tmpThreshold && zaznanPeak == 1) {
+                zaznanPeak = 0;
+                tmpThreshold = 0.05 * 0.15 * PEAK + (1 - 0.05) * tmpThreshold;
+                PEAK = 0;
+            }
+            signals[i] = zaznanPeak;
         }
-        return signals;
+        return signals[signals.length - 1];
     }
 }    
