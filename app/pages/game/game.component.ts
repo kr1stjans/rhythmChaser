@@ -4,18 +4,14 @@ import {Page} from "ui/page";
 import {TNSPlayer, AudioPlayerOptions} from 'nativescript-audio';
 
 import {Label} from "ui/label";
-import {prompt, inputType} from "ui/dialogs";
 import {AbsoluteLayout} from "ui/layouts/absolute-layout";
 import {Animation} from "ui/animation";
-import {ListPicker} from "ui/list-picker";
 import {QuickGestureDetectable, QuickGestureDetection} from "../../shared/detection.component";
 import {MusicService} from "./music.services";
 import {StackLayout} from "ui/layouts/stack-layout";
 import {screen, device} from "platform";
 import {AnimationCurve} from "ui/enums";
-import {ListView} from "ui/list-view";
 import {ItemEventData} from "ui/list-view";
-import {LayoutBase} from "ui/layouts/layout-base";
 import {RouterExtensions} from "nativescript-angular";
 import {ScoreService} from "./score.services";
 
