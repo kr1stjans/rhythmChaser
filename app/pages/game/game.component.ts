@@ -11,13 +11,14 @@ import {ListPicker} from "ui/list-picker";
 import {QuickGestureDetectable, QuickGestureDetection} from "../../shared/detection.component";
 import {MusicService} from "./music.services";
 import {StackLayout} from "ui/layouts/stack-layout";
-import {screen} from "platform";
+import {screen, device} from "platform";
 import {AnimationCurve} from "ui/enums";
 import {ListView} from "ui/list-view";
 import {ItemEventData} from "ui/list-view";
 import {LayoutBase} from "ui/layouts/layout-base";
 import {RouterExtensions} from "nativescript-angular";
 import {ScoreService} from "./score.services";
+
 
 @Component({
     selector: "game",
@@ -66,6 +67,10 @@ export class GameComponent implements OnInit, OnDestroy, QuickGestureDetectable 
                 timeLabel.text = (this.songDuration - ((new Date().getTime() - this.startTime) / 1000)).toFixed(0) + "s";
             }
         }, 100);
+
+        this.scoresLayout.on("tap", () => {
+            this.quickGestureDetected();
+        });
     }
 
     public onItemLoading(args: ItemEventData) {
@@ -167,27 +172,14 @@ export class GameComponent implements OnInit, OnDestroy, QuickGestureDetectable 
                 audioFile: filepath,
                 loop: false,
                 completeCallback: () => {
-
                     clearInterval(this.updateCallback);
-
-                    prompt({
-                        title: "Score: " + this.score,
-                        message: "Enter your name",
-                        okButtonText: "Ok",
-                        cancelButtonText: "Cancel",
-                        defaultText: "Kristjan",
-                        inputType: inputType.text
-                    }).then(r => {
-                        console.log("Dialog result: " + r.result + ", text: " + r.text);
-                        this.scoreService.updateScore(r.text, this.selectedSong['id'], this.score);
-                        this.routerExtensions.navigate([""], {clearHistory: true});
-                    });
-
+                    this.scoreService.updateScore(device.uuid, this.selectedSong['id'], this.score);
                     this.player.dispose().then(() => {
                         console.log('DISPOSED');
                     }, (err) => {
                         console.log('ERROR disposePlayer: ' + err);
                     });
+                    this.routerExtensions.navigate([""], {clearHistory: true});
                 },
 
                 errorCallback: (err) => {

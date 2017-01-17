@@ -10,7 +10,9 @@
                 <Label class="song-item-label song-title" textWrap="true"
                        text="{{item.author}} - {{item.title}}"></Label>
                 <Label class="song-item-label" textWrap="true"
-                       text="Your best: {{item.user_score != null ? item.user_score : 0}} - World best: {{item.high_score != null ? item.high_score : 0}}"></Label>
+                       text="Your best: {{item.user_score}}"></Label>
+                <Label class="song-item-label" textWrap="true"
+                       text="World best: {{item.high_score}}"></Label>
             </StackLayout>
         </template>
     </ListView>
