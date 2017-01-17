@@ -4,50 +4,75 @@ import {Page} from "ui/page";
 import {TNSPlayer, AudioPlayerOptions} from 'nativescript-audio';
 
 import {Label} from "ui/label";
+import {prompt, inputType} from "ui/dialogs";
 import {AbsoluteLayout} from "ui/layouts/absolute-layout";
 import {Animation} from "ui/animation";
 import {ListPicker} from "ui/list-picker";
 import {QuickGestureDetectable, QuickGestureDetection} from "../../shared/detection.component";
 import {MusicService} from "./music.services";
 import {StackLayout} from "ui/layouts/stack-layout";
+import {screen} from "platform";
+import {AnimationCurve} from "ui/enums";
+import {ListView} from "ui/list-view";
+import {ItemEventData} from "ui/list-view";
+import {LayoutBase} from "ui/layouts/layout-base";
+import {RouterExtensions} from "nativescript-angular";
+import {ScoreService} from "./score.services";
 
 @Component({
     selector: "game",
     templateUrl: "pages/game/game.html",
-    providers: [MusicService]
+    providers: [MusicService, ScoreService]
 })
 export class GameComponent implements OnInit, OnDestroy, QuickGestureDetectable {
     private player: TNSPlayer;
     private scoresLayout: AbsoluteLayout;
 
     private quickGestureDetection: QuickGestureDetection;
-    private songPicker: ListPicker;
 
     // score variables
     private score: number = 0;
     private scoreMultiplier: number = 1;
 
-    private songs: Array<any>;
     private selectedSong;
 
     // beat variables
     private startTime: number;
+    private songDuration: number;
 
-    constructor(private musicService: MusicService, private zone: NgZone, private page: Page) {
+    private songList: Array<Object> = [];
+
+    private updateCallback;
+
+    constructor(private scoreService: ScoreService, private routerExtensions: RouterExtensions, private musicService: MusicService, private zone: NgZone, private page: Page) {
     }
 
     /**
      * Clear song picker and init gesture & audio player.
      */
-    private play() {
+    private listViewItemTap(args) {
+
         this.quickGestureDetection = new QuickGestureDetection(this);
         this.player = new TNSPlayer();
-        this.selectedSong = this.songs[this.songPicker.selectedIndex];
-        this.playAudio(this.selectedSong['url_music'], "remoteFile", () => {
-            this.startTime = new Date().getTime();
-        });
+        this.selectedSong = this.songList[args.index];
+        this.playAudio(this.selectedSong['url_music']);
 
         this.scoresLayout.removeChildren();
+        var scoreLabel = this.createAbsoluteLabel("", 0, 0);
+        var timeLabel = this.createAbsoluteLabel("", screen.mainScreen.widthDIPs - 60, 0);
+        this.updateCallback = setInterval(() => {
+            scoreLabel.text = "Score: " + this.score;
+            if (this.songDuration != null) {
+                timeLabel.text = (this.songDuration - ((new Date().getTime() - this.startTime) / 1000)).toFixed(0) + "s";
+            }
+        }, 100);
+    }
+
+    public onItemLoading(args: ItemEventData) {
+        if (args.ios) {
+            // args.ios is instance of UITableViewCell
+            args.ios.selectionStyle = 0;  // UITableViewCellSelectionStyle.UITableViewCellSelectionStyleNone;
+        }
     }
 
     /**
@@ -55,21 +80,9 @@ export class GameComponent implements OnInit, OnDestroy, QuickGestureDetectable 
      */
     public ngOnInit() {
         this.scoresLayout = <StackLayout> this.page.getViewById("scoresLayout");
-
-        this.songPicker = new ListPicker();
-        this.songPicker.cssClass = "song-picker";
-        this.scoresLayout.addChild(this.songPicker);
-
         this.musicService.getData().map(json => json.content).subscribe(
             (result) => {
-                this.songs = result;
-                this.songPicker.items = result.map(item =>
-                item['author'] + " - " +
-                item['title'] +
-                "(Your best: " +
-                (item['user_score'] != null ? item['user_score'] : 0) +
-                ", World best: " +
-                (item['high_score'] != null ? item['high_score'] : 0));
+                this.songList = result;
             },
             (error) => console.log(error)
         );
@@ -86,35 +99,57 @@ export class GameComponent implements OnInit, OnDestroy, QuickGestureDetectable 
         for (let beat of beats) {
             // beat at current time detected
             var diff = Math.abs(beat - timeSinceStartInSeconds);
-            if (diff < 0.13) { // 0.11 hard
+            if (diff < 0.12) {
                 actualBeatExists = true;
                 break;
             }
         }
-        this.scoresLayout.removeChildren();
         if (actualBeatExists) {
-            this.createGestureDetectedLabel("x " + this.scoreMultiplier);
             this.score += this.scoreMultiplier;
             this.scoreMultiplier++;
         } else {
             this.scoreMultiplier = 0;
         }
+        this.createGestureDetectedLabel(actualBeatExists ? "+" + this.scoreMultiplier : "Missed!", actualBeatExists, 2500, 0, this.scoreMultiplier / 10);
     }
 
-    private createGestureDetectedLabel(text: string) {
+    private createGestureDetectedLabel(text: string, correctDetection: boolean = true, duration: number = 2500, minimumOpacity = 0, expand: number = 0) {
+        var minimum = Math.min(screen.mainScreen.widthDIPs, screen.mainScreen.heightDIPs);
+
         var label = new Label();
         label.textWrap = true;
-        label.cssClass = "gesture-detected";
+        label.cssClass = correctDetection ? "correct-detection" : "false-detection";
         label.text = text;
+        label.style.width = minimum / 2 * (1 + expand);
+        label.style.height = minimum / 2 * (1 + expand);
+        label.style.borderRadius = minimum / 4 * (1 + expand);
+        label.style.fontSize = 35 * (1 + expand / 2);
 
+        AbsoluteLayout.setLeft(label, screen.mainScreen.widthDIPs / 2 - (label.style.width / 2));
+        AbsoluteLayout.setTop(label, screen.mainScreen.heightDIPs / 2 - (label.style.height / 2));
         this.scoresLayout.addChild(label);
 
         var animation: Animation = label.createAnimation({
-            duration: 1500,
-            scale: {x: 0.1, y: 0.1},
+            opacity: minimumOpacity,
+            duration: duration,
+            curve: AnimationCurve.easeIn
         });
 
         return animation.play();
+    }
+
+    private createAbsoluteLabel(text: string, left: number, top: number) {
+        var label = new Label();
+        label.textWrap = true;
+        label.style.fontSize = 24;
+        label.style.textAlignment = 'left';
+        label.text = text;
+        label.style.zIndex = 1000;
+
+        AbsoluteLayout.setLeft(label, left);
+        AbsoluteLayout.setTop(label, top);
+        this.scoresLayout.addChild(label);
+        return label;
     }
 
     public ngOnDestroy() {
@@ -126,12 +161,28 @@ export class GameComponent implements OnInit, OnDestroy, QuickGestureDetectable 
         return this.zone;
     }
 
-    private playAudio(filepath: string, fileType: string, callback) {
+    private playAudio(filepath: string) {
         try {
             var playerOptions: AudioPlayerOptions = {
                 audioFile: filepath,
                 loop: false,
                 completeCallback: () => {
+
+                    clearInterval(this.updateCallback);
+
+                    prompt({
+                        title: "Score: " + this.score,
+                        message: "Enter your name",
+                        okButtonText: "Ok",
+                        cancelButtonText: "Cancel",
+                        defaultText: "Kristjan",
+                        inputType: inputType.text
+                    }).then(r => {
+                        console.log("Dialog result: " + r.result + ", text: " + r.text);
+                        this.scoreService.updateScore(r.text, this.selectedSong['id'], this.score);
+                        this.routerExtensions.navigate([""], {clearHistory: true});
+                    });
+
                     this.player.dispose().then(() => {
                         console.log('DISPOSED');
                     }, (err) => {
@@ -149,16 +200,14 @@ export class GameComponent implements OnInit, OnDestroy, QuickGestureDetectable 
             };
 
 
-            if (fileType === 'localFile') {
-                this.player.playFromFile(playerOptions).then(() => {
-                }, (err) => {
-                    console.log(err);
+            this.player.playFromUrl(playerOptions).then(() => {
+                this.startTime = new Date().getTime();
+                this.player.getAudioTrackDuration().then((result) => {
+                    this.songDuration = +result;
                 });
-            } else if (fileType === 'remoteFile') {
-                this.player.playFromUrl(playerOptions).then(callback, (err) => {
-                    console.log(err);
-                });
-            }
+            }, (err) => {
+                console.log(err);
+            });
         } catch (ex) {
             console.log(ex);
         }

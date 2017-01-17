@@ -3,30 +3,50 @@ var core_1 = require("@angular/core");
 var page_1 = require("ui/page");
 var nativescript_audio_1 = require('nativescript-audio');
 var label_1 = require("ui/label");
-var list_picker_1 = require("ui/list-picker");
+var dialogs_1 = require("ui/dialogs");
+var absolute_layout_1 = require("ui/layouts/absolute-layout");
 var detection_component_1 = require("../../shared/detection.component");
 var music_services_1 = require("./music.services");
+var platform_1 = require("platform");
+var enums_1 = require("ui/enums");
+var nativescript_angular_1 = require("nativescript-angular");
+var score_services_1 = require("./score.services");
 var GameComponent = (function () {
-    function GameComponent(musicService, zone, page) {
+    function GameComponent(scoreService, routerExtensions, musicService, zone, page) {
+        this.scoreService = scoreService;
+        this.routerExtensions = routerExtensions;
         this.musicService = musicService;
         this.zone = zone;
         this.page = page;
         // score variables
         this.score = 0;
         this.scoreMultiplier = 1;
+        this.songList = [];
     }
     /**
      * Clear song picker and init gesture & audio player.
      */
-    GameComponent.prototype.play = function () {
+    GameComponent.prototype.listViewItemTap = function (args) {
         var _this = this;
         this.quickGestureDetection = new detection_component_1.QuickGestureDetection(this);
         this.player = new nativescript_audio_1.TNSPlayer();
-        this.selectedSong = this.songs[this.songPicker.selectedIndex];
-        this.playAudio(this.selectedSong['url_music'], "remoteFile", function () {
-            _this.startTime = new Date().getTime();
-        });
+        this.selectedSong = this.songList[args.index];
+        this.playAudio(this.selectedSong['url_music']);
         this.scoresLayout.removeChildren();
+        var scoreLabel = this.createAbsoluteLabel("", 0, 0);
+        var timeLabel = this.createAbsoluteLabel("", platform_1.screen.mainScreen.widthDIPs - 60, 0);
+        this.updateCallback = setInterval(function () {
+            scoreLabel.text = "Score: " + _this.score;
+            if (_this.songDuration != null) {
+                timeLabel.text = (_this.songDuration - ((new Date().getTime() - _this.startTime) / 1000)).toFixed(0) + "s";
+            }
+        }, 100);
+    };
+    GameComponent.prototype.onItemLoading = function (args) {
+        if (args.ios) {
+            // args.ios is instance of UITableViewCell
+            args.ios.selectionStyle = 0; // UITableViewCellSelectionStyle.UITableViewCellSelectionStyleNone;
+        }
     };
     /**
      * Init song picker and fetch songs from backend.
@@ -34,19 +54,8 @@ var GameComponent = (function () {
     GameComponent.prototype.ngOnInit = function () {
         var _this = this;
         this.scoresLayout = this.page.getViewById("scoresLayout");
-        this.songPicker = new list_picker_1.ListPicker();
-        this.songPicker.cssClass = "song-picker";
-        this.scoresLayout.addChild(this.songPicker);
         this.musicService.getData().map(function (json) { return json.content; }).subscribe(function (result) {
-            _this.songs = result;
-            _this.songPicker.items = result.map(function (item) {
-                return item['author'] + " - " +
-                    item['title'] +
-                    "(Your best: " +
-                    (item['user_score'] != null ? item['user_score'] : 0) +
-                    ", World best: " +
-                    (item['high_score'] != null ? item['high_score'] : 0);
-            });
+            _this.songList = result;
         }, function (error) { return console.log(error); });
     };
     GameComponent.prototype.quickGestureDetected = function () {
@@ -59,32 +68,55 @@ var GameComponent = (function () {
             var beat = beats_1[_i];
             // beat at current time detected
             var diff = Math.abs(beat - timeSinceStartInSeconds);
-            if (diff < 0.13) {
+            if (diff < 0.12) {
                 actualBeatExists = true;
                 break;
             }
         }
-        this.scoresLayout.removeChildren();
         if (actualBeatExists) {
-            this.createGestureDetectedLabel("x " + this.scoreMultiplier);
             this.score += this.scoreMultiplier;
             this.scoreMultiplier++;
         }
         else {
             this.scoreMultiplier = 0;
         }
+        this.createGestureDetectedLabel(actualBeatExists ? "+" + this.scoreMultiplier : "Missed!", actualBeatExists, 2500, 0, this.scoreMultiplier / 10);
     };
-    GameComponent.prototype.createGestureDetectedLabel = function (text) {
+    GameComponent.prototype.createGestureDetectedLabel = function (text, correctDetection, duration, minimumOpacity, expand) {
+        if (correctDetection === void 0) { correctDetection = true; }
+        if (duration === void 0) { duration = 2500; }
+        if (minimumOpacity === void 0) { minimumOpacity = 0; }
+        if (expand === void 0) { expand = 0; }
+        var minimum = Math.min(platform_1.screen.mainScreen.widthDIPs, platform_1.screen.mainScreen.heightDIPs);
         var label = new label_1.Label();
         label.textWrap = true;
-        label.cssClass = "gesture-detected";
+        label.cssClass = correctDetection ? "correct-detection" : "false-detection";
         label.text = text;
+        label.style.width = minimum / 2 * (1 + expand);
+        label.style.height = minimum / 2 * (1 + expand);
+        label.style.borderRadius = minimum / 4 * (1 + expand);
+        label.style.fontSize = 35 * (1 + expand / 2);
+        absolute_layout_1.AbsoluteLayout.setLeft(label, platform_1.screen.mainScreen.widthDIPs / 2 - (label.style.width / 2));
+        absolute_layout_1.AbsoluteLayout.setTop(label, platform_1.screen.mainScreen.heightDIPs / 2 - (label.style.height / 2));
         this.scoresLayout.addChild(label);
         var animation = label.createAnimation({
-            duration: 1500,
-            scale: { x: 0.1, y: 0.1 },
+            opacity: minimumOpacity,
+            duration: duration,
+            curve: enums_1.AnimationCurve.easeIn
         });
         return animation.play();
+    };
+    GameComponent.prototype.createAbsoluteLabel = function (text, left, top) {
+        var label = new label_1.Label();
+        label.textWrap = true;
+        label.style.fontSize = 24;
+        label.style.textAlignment = 'left';
+        label.text = text;
+        label.style.zIndex = 1000;
+        absolute_layout_1.AbsoluteLayout.setLeft(label, left);
+        absolute_layout_1.AbsoluteLayout.setTop(label, top);
+        this.scoresLayout.addChild(label);
+        return label;
     };
     GameComponent.prototype.ngOnDestroy = function () {
         this.player.pause();
@@ -93,13 +125,26 @@ var GameComponent = (function () {
     GameComponent.prototype.getNgZone = function () {
         return this.zone;
     };
-    GameComponent.prototype.playAudio = function (filepath, fileType, callback) {
+    GameComponent.prototype.playAudio = function (filepath) {
         var _this = this;
         try {
             var playerOptions = {
                 audioFile: filepath,
                 loop: false,
                 completeCallback: function () {
+                    clearInterval(_this.updateCallback);
+                    dialogs_1.prompt({
+                        title: "Score: " + _this.score,
+                        message: "Enter your name",
+                        okButtonText: "Ok",
+                        cancelButtonText: "Cancel",
+                        defaultText: "Kristjan",
+                        inputType: dialogs_1.inputType.text
+                    }).then(function (r) {
+                        console.log("Dialog result: " + r.result + ", text: " + r.text);
+                        _this.scoreService.updateScore(r.text, _this.selectedSong['id'], _this.score);
+                        _this.routerExtensions.navigate([""], { clearHistory: true });
+                    });
                     _this.player.dispose().then(function () {
                         console.log('DISPOSED');
                     }, function (err) {
@@ -113,17 +158,14 @@ var GameComponent = (function () {
                     console.log("what: " + info);
                 }
             };
-            if (fileType === 'localFile') {
-                this.player.playFromFile(playerOptions).then(function () {
-                }, function (err) {
-                    console.log(err);
+            this.player.playFromUrl(playerOptions).then(function () {
+                _this.startTime = new Date().getTime();
+                _this.player.getAudioTrackDuration().then(function (result) {
+                    _this.songDuration = +result;
                 });
-            }
-            else if (fileType === 'remoteFile') {
-                this.player.playFromUrl(playerOptions).then(callback, function (err) {
-                    console.log(err);
-                });
-            }
+            }, function (err) {
+                console.log(err);
+            });
         }
         catch (ex) {
             console.log(ex);
@@ -133,9 +175,9 @@ var GameComponent = (function () {
         core_1.Component({
             selector: "game",
             templateUrl: "pages/game/game.html",
-            providers: [music_services_1.MusicService]
+            providers: [music_services_1.MusicService, score_services_1.ScoreService]
         }), 
-        __metadata('design:paramtypes', [music_services_1.MusicService, core_1.NgZone, page_1.Page])
+        __metadata('design:paramtypes', [score_services_1.ScoreService, nativescript_angular_1.RouterExtensions, music_services_1.MusicService, core_1.NgZone, page_1.Page])
     ], GameComponent);
     return GameComponent;
 }());

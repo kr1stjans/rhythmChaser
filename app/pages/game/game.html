@@ -1,7 +1,17 @@
 <ActionBar title="Rhythm Chaser">
     <NavigationButton text="" android.systemIcon="ic_menu_back"></NavigationButton>
-    <ActionItem id="tutorialActionItem" ios.systemIcon="17" ios.position="right"
-                android.systemIcon="ic_btn_search_go" (tap)="play()"></ActionItem>
 </ActionBar>
-<StackLayout id="scoresLayout">
-</StackLayout>
+<AbsoluteLayout id="scoresLayout">
+    <ListView id="songList" [items]="songList" class="song-picker" (itemLoading)="onItemLoading($event)"
+              (itemTap)="listViewItemTap($event)">
+        <template let-item="item">
+            <StackLayout orientation="vertical"
+                         style="background-color: #FFF0A5; padding-left: 15; padding-right: 15; padding-top: 5; padding-bottom: 5;">
+                <Label class="song-item-label song-title" textWrap="true"
+                       text="{{item.author}} - {{item.title}}"></Label>
+                <Label class="song-item-label" textWrap="true"
+                       text="Your best: {{item.user_score != null ? item.user_score : 0}} - World best: {{item.high_score != null ? item.high_score : 0}}"></Label>
+            </StackLayout>
+        </template>
+    </ListView>
+</AbsoluteLayout>
