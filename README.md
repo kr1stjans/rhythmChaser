@@ -1,5 +1,11 @@
 # rhythmChaser
 
+### Installing
+
+* Install Nativescript http://docs.nativescript.org/angular/start/quick-setup
+* tns platform add ios && tns run ios --emulator
+* tns platform add android && tns run android --emulator
+
 ### Vision
 Let everyone, everywhere learn music in a fun and intuitive way. Start with the most basic musical tool: rhythm. Rhythm can be signaled with applauds, hand beats, anything that moves. We will use phone movement.
 
@@ -26,13 +32,6 @@ User will move a phone in sync with the song’s rhythm. The better the sync, th
 
 ### Problems
 * Headaches and handpain after playing it for a while shaking hand
-
-### Installing
-
-* Install Nativescript http://docs.nativescript.org/angular/start/quick-setup
-* tns platform add ios && tns run ios --emulator
-* tns platform add android && tns run android --emulator
-
 
 ### Development
 
